@@ -1,0 +1,135 @@
+' Dictionary Format
+
+Option Explicit
+
+Sub main3()
+    Dim mainRng As Range, list1Rng As Range
+    Dim mainDict As New Scripting.Dictionary, list1Dict As New Scripting.Dictionary
+
+    Set mainRng = GetRange(Worksheets("Main"), "D") '<--| get "Main" sheet column "D" range from row 1 down to last non empty row
+    Set list1Rng = GetRange(Worksheets("list1"), "A") '<--| get "list1" sheet column "D" range from row 1 down to last non empty row
+
+    Set mainDict = GetDictionary(mainRng)
+    Set list1Dict = GetDictionary(list1Rng)
+
+    ColorMatchingRange2 mainRng, mainDict, list1Dict
+    ColorMatchingRange2 list1Rng, list1Dict, mainDict
+
+End Sub
+
+Sub ColorMatchingRange2(rng1 As Range, dict1 As Scripting.Dictionary, dict2 As Scripting.Dictionary)
+    Dim unionRng As Range
+    Dim vals As Variant
+    Dim i As Long
+
+    vals = Application.Transpose(rng1.Value)
+
+    Set unionRng = rng1.Offset(, rng1.Columns.Count).Resize(1, 1)
+    For i = LBound(vals) To UBound(vals)
+        If dict2.Exists(vals(i)) Then Set unionRng = Union(unionRng, rng1(i, 1))
+    Next i
+
+    Set unionRng = Intersect(unionRng, rng1)
+    If Not unionRng Is Nothing Then
+        With unionRng.Interior
+            .PatternColorIndex = xlAutomatic
+            .Color = 65535
+            .TintAndShade = 0
+        End With
+    End If
+End Sub
+
+Function GetDictionary(rng As Range) As Scripting.Dictionary
+    Dim dict As New Scripting.Dictionary
+    Dim vals As Variant
+    Dim i As Long
+
+    vals = Application.Transpose(rng.Value)
+
+    On Error Resume Next
+    For i = LBound(vals) To UBound(vals)
+        dict.Add vals(i), rng(i, 1).Address
+    Next i
+    On Error GoTo 0
+    Set GetDictionary = dict
+End Function
+
+Function GetRange(ws As Worksheet, colIndex As String) As Range
+    With ws '<--| reference passed worksheet
+        Set GetRange = .Range(colIndex & "1", .Cells(.Rows.Count, colIndex).End(xlUp)) '<--| set its column "colIndex" range from row 1 down to last non empty row
+    End With
+End Function
+
+
+
+'Range approach
+Option Explicit
+
+Sub main2()
+    Dim mainRng As Range, list1Rng As Range
+
+    Set mainRng = GetRange(Worksheets("Main"), "D") '<--| get "Main" sheet column "D" range from row 1 down to last non empty row
+    Set list1Rng = GetRange(Worksheets("list1"), "A") '<--| get "list1" sheet column "D" range from row 1 down to last non empty row
+
+    ColorMatchingRange mainRng, list1Rng
+    ColorMatchingRange list1Rng, mainRng
+
+End Sub
+
+Sub ColorMatchingRange(rng1 As Range, rng2 As Range)
+    Dim unionRng As Range, cell As Range, f As Range
+
+    Set unionRng = rng1.Offset(, rng1.Columns.Count).Resize(1, 1)
+    For Each cell In rng1
+        If WorksheetFunction.CountIf(rng2, "*" & cell.Value & "*") > 0 Then Set unionRng = Union(unionRng, cell)
+    Next cell
+    Set unionRng = Intersect(unionRng, rng1)
+    If Not unionRng Is Nothing Then
+        With unionRng.Interior
+            .PatternColorIndex = xlAutomatic
+            .Color = 65535
+            .TintAndShade = 0
+        End With
+    End If
+End Sub
+
+Function GetRange(ws As Worksheet, colIndex As String) As Range
+    With ws '<--| reference passed worksheet
+        Set GetRange = .Range(colIndex & "1", .Cells(.Rows.Count, colIndex).End(xlUp)) '<--| set its column "colIndex" range from row 1 down to last non empty row
+    End With
+End Function
+
+
+' Conditional Formatting Approach
+Option Explicit
+
+Sub main()
+    Dim mainRng As Range, list1Rng As Range
+
+    Set mainRng = GetRange(Worksheets("Main"), "D") '<--| get "Main" sheet column "D" range from row 1 down to last non empty row
+    Set list1Rng = GetRange(Worksheets("list1"), "A") '<--| get "list1" sheet column "D" range from row 1 down to last non empty row
+
+    AddCrossCountFormatCondition mainRng, list1Rng '<--| add cross validation from "Main" to "List1" worksheet
+    AddCrossCountFormatCondition list1Rng, mainRng '<--| add cross validation from "List1" to "Main" worksheet
+
+End Sub
+
+Function GetRange(ws As Worksheet, colIndex As String) As Range
+    With ws '<--| reference passed worksheet
+        Set GetRange = .Range(colIndex & "1", .Cells(.Rows.Count, colIndex).End(xlUp)) '<--| set its column "colIndex" range from row 1 down to last non empty row
+    End With
+End Function
+
+Sub AddCrossCountFormatCondition(rng1 As Range, rng2 As Range)
+    With rng1
+        Intersect(rng1.Parent.UsedRange, rng1.Resize(1, 1).EntireColumn).FormatConditions.Delete '<--| remove previous conditional formatting
+        .FormatConditions.Add Type:=xlExpression, Formula1:= _
+            "=COUNTIF(" & rng2.Parent.Name & "!" & rng2.Address & ",concatenate(""*""," & rng1.Resize(1, 1).Address(False, False) & ",""*""))>0"
+        .FormatConditions(.FormatConditions.Count).SetFirstPriority
+        With .FormatConditions(1).Interior
+            .PatternColorIndex = xlAutomatic
+            .Color = 65535
+            .TintAndShade = 0
+        End With
+    End With
+End Sub
